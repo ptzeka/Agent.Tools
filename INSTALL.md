@@ -30,7 +30,7 @@ pinned to a version that ships `prebuilds/` for darwin/linux/win32).
 codemcp has nothing to serve until codeindex publishes at least one snapshot:
 
 ```bash
-cd codeindex && npm run publish:file
+npm run index:publish        # from the repo root (wraps codeindex publish:file)
 ```
 
 The layout is repo-first: confirm `codeindex/data/<owner>/<repo>/schema_versions.json`
@@ -38,13 +38,13 @@ and `codeindex/data/<owner>/<repo>/commits/<sha>/` exist, the latter holding
 `chunks.jsonl` + `commit.json` + `edges.jsonl` (the relationship graph). codemcp
 auto-discovers every `<owner>/<repo>/` subtree under `codeindex/data/`.
 
-To index a **different** repository, run codeindex from that repo's root (or pass
-`--root <path>`) — see `codeindex --help` and
+To index a **different** repository, pass its root:
+`npm run index:publish -- --root <path> [--branch <name>]` — see
+`codeindex --help` and
 [codeindex.config.example.json](codeindex/codeindex.config.example.json).
 
-To wipe stale snapshots: delete the `codeindex/data/<owner>/<repo>/` subtree for
-the repository you no longer want served. (The `scripts/clear-codeindex.*`
-helpers predate the repo-first layout — don't rely on them until updated.)
+To wipe stale snapshots: `npm run index:clear` (add `-- --repo <owner>/<name>`
+to clear one repository, `-- --yes` to skip the prompt).
 
 memomcp needs no indexing step; its file backend creates
 `memomcp/data/memories/<collection>/records.jsonl` on first `remember`.
@@ -106,13 +106,18 @@ tools then appear as `mcp__codemcp__*` and `mcp__memomcp__*`.
 
 ## 5. Verify end-to-end
 
-Work top-down; stop at the first failure — it names the step to redo.
+```bash
+npm run verify
+```
 
-1. **Registered?** the `codemcp` and `memomcp` keys exist in the target config
-   as `"command": "codemcp"` / `"command": "memomcp"` (global configs; the repo
-   `mcpServers.json` uses the npx form).
+[scripts/verify.mjs](scripts/verify.mjs) checks steps 1–4 below in dependency
+order and stops at the first failure — it names the step to redo. The manual
+equivalents, plus the live check it cannot script:
+
+1. **Built?** `codeindex/dist/cli.js`, `codemcp/dist/server.js`, and
+   `memomcp/dist/server.js` exist.
 2. **Linked?** `npm ls -g @peritze/codemcp @peritze/codeindex @peritze/memomcp` —
-   the links must point at THIS checkout (and `dist/` must exist, i.e. built).
+   the links must point at THIS checkout.
 3. **Indexed?** `ls codeindex/data/<owner>/<repo>/schema_versions.json codeindex/data/<owner>/<repo>/commits`
 4. **Answers standalone?** (from any cwd, proving the global shims)
 
@@ -121,7 +126,9 @@ Work top-down; stop at the first failure — it names the step to redo.
    memomcp --backend file --embed-provider local probe recall '{"query":"anything"}'
    ```
 
-5. **Answers live?** after a host restart:
+5. **Answers live?** (manual — needs the MCP host) after a host restart, and
+   after confirming the `codemcp`/`memomcp` keys exist in the target config as
+   `"command": "codemcp"` / `"command": "memomcp"`:
    - `mcp__codemcp__list_commits` must list the snapshot published in step 2;
      then `mcp__codemcp__get_symbol {"name":"wireParser"}` must return that
      function's line-precise chunk from codeindex/src/wiring.ts, and
@@ -129,6 +136,31 @@ Work top-down; stop at the first failure — it names the step to redo.
      list its implementers and importers from the edge graph.
    - `mcp__memomcp__remember {"content":"install smoke test"}` then
      `mcp__memomcp__recall {"query":"smoke test"}` must return it.
+
+## 6. Install the codemcp agent skill globally
+
+[skills/codemcp/SKILL.md](skills/codemcp/SKILL.md) teaches an agent to (re)index a
+repo, validate the server, and pick the right retrieval tool. It lives outside
+`.claude/skills/`, so no host picks it up automatically — link it into the
+**global** skills directory (`~/.claude/skills/`) so it is available in every
+project, and updates to this checkout apply without re-copying:
+
+```powershell
+# Windows (junction — no admin rights needed); run from the repo root
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\skills" | Out-Null
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\skills\codemcp" -Target "$PWD\skills\codemcp"
+```
+
+```bash
+# macOS / Linux; run from the repo root
+mkdir -p ~/.claude/skills
+ln -s "$PWD/skills/codemcp" ~/.claude/skills/codemcp
+```
+
+(If you prefer a detached copy over a link: `cp -r skills/codemcp ~/.claude/skills/`.)
+
+Verify: a new Claude Code session lists `codemcp` among available skills, and
+`/codemcp` invokes it.
 
 ## Using the tools
 

@@ -1,6 +1,6 @@
 export type EdgeType = 'imports' | 'calls' | 'implements' | 'extends';
 
-// mirrors codeindex's CodeEdge (types.ts) — the writer/reader contract for edges.jsonl.
+// mirrors @peritze/graphstore's GraphEdge — the writer/reader contract for edge rows.
 // Endpoints are entity ids: `<path>`, `<path>#Symbol`, `<path>#Class.method`,
 // `external:<module>`, `unresolved:<name>`
 export interface EdgeRow {

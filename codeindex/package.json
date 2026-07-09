@@ -26,7 +26,11 @@
     "publish:file": "node dist/cli.js --backend file publish",
     "publish:pg": "node dist/cli.js --backend pg publish"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
+    "@peritze/graphstore": "*",
     "@peritze/vectorizer": "*",
     "@peritze/vectorstore": "*",
     "commander": "^12.1.0",

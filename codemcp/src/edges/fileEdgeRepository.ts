@@ -1,34 +1,36 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { FileGraphStore, PgGraphStore, type IGraphStore } from '@peritze/graphstore';
 
 import type { EdgeRow, IEdgeRepository } from './types.js';
 
-// reads the edges.jsonl sidecar codeindex co-locates with each snapshot at
+// both backends delegate to @peritze/graphstore — the same store family codeindex
+// publishes through, so reader and writer share one layout/table contract.
+// listEdges stays unfiltered: get_relationships does fuzzy entity matching
+// (symbol-name suffixes) that a store-side exact filter cannot express.
+
+// file backend reads the edges.jsonl sidecar co-located with each snapshot at
 // <baseDir>/commits/<sha>/edges.jsonl; read-per-call like the chunk store, so a
 // republish is visible without a server restart
 export class FileEdgeRepository implements IEdgeRepository {
-  constructor(private readonly baseDir: string) {}
+  private readonly store: IGraphStore;
+
+  constructor(baseDir: string) {
+    this.store = new FileGraphStore({ baseDir, partitionDir: 'commits' });
+  }
 
   async listEdges(commitSha: string): Promise<EdgeRow[]> {
-    const path = join(this.baseDir, 'commits', commitSha, 'edges.jsonl');
-    if (!existsSync(path)) return [];
-    return readFileSync(path, 'utf-8')
-      .split(/\r?\n/)
-      .filter(line => line.trim().length > 0)
-      .flatMap(line => {
-        try {
-          return [JSON.parse(line) as EdgeRow];
-        } catch {
-          return [];
-        }
-      });
+    return this.store.list(commitSha);
   }
 }
 
-// pg has no edges table yet (BACKLOG: pg edge parity); an empty result reads the
-// same as "this commit was indexed before edge extraction existed"
-export class NoEdgeRepository implements IEdgeRepository {
-  async listEdges(): Promise<EdgeRow[]> {
-    return [];
+// pg backend reads the code_edges table codeindex's PgGraphStore publishes into
+export class PgEdgeRepository implements IEdgeRepository {
+  private readonly store: IGraphStore;
+
+  constructor(connectionString: string) {
+    this.store = new PgGraphStore(connectionString);
+  }
+
+  async listEdges(commitSha: string): Promise<EdgeRow[]> {
+    return this.store.list(commitSha);
   }
 }

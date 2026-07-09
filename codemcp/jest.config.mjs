@@ -8,6 +8,7 @@ export default {
     "^@peritze/mcp-tool-server$": "<rootDir>/../mcp-tool-server/src/index.ts",
     "^@peritze/mcp-tool-server/(.*)$": "<rootDir>/../mcp-tool-server/src/$1.ts",
     "^@peritze/vectorstore$": "<rootDir>/../vectorstore/src/index.ts",
+    "^@peritze/graphstore$": "<rootDir>/../graphstore/src/index.ts",
     "^@peritze/vectorizer$": "<rootDir>/../vectorizer/src/index.ts",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },

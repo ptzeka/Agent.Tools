@@ -8,6 +8,7 @@
     "mcp-tool-server",
     "vectorizer",
     "vectorstore",
+    "graphstore",
     "codeindex",
     "codemcp",
     "memomcp"
@@ -17,7 +18,10 @@
     "test": "npm run test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present",
     "link:cli": "npm link -w @peritze/codemcp -w @peritze/codeindex -w @peritze/memomcp",
-    "unlink:cli": "npm rm -g @peritze/codemcp @peritze/codeindex @peritze/memomcp"
+    "unlink:cli": "npm rm -g @peritze/codemcp @peritze/codeindex @peritze/memomcp",
+    "index:publish": "node scripts/publish-codeindex.mjs",
+    "index:clear": "node scripts/clear-codeindex.mjs",
+    "verify": "node scripts/verify.mjs"
   },
   "devDependencies": {
     "rimraf": "^6.0.1",

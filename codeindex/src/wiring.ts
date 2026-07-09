@@ -5,6 +5,7 @@ import {
   type DbConnectionFactory,
   type IVectorStore,
 } from '@peritze/vectorstore';
+import { FileGraphStore, PgGraphStore, type IGraphStore } from '@peritze/graphstore';
 import type { CodeIndexConfig } from './config.js';
 import type { CommitRepository } from './db/pgRepository.js';
 import { PgCommitRepositoryImpl } from './db/pgRepository.js';
@@ -25,13 +26,15 @@ const RECORDS_FILE = 'chunks.jsonl';
 export interface WiredWriter {
   // generic similarity store for chunk rows (namespace = commit sha)
   vectorStore: IVectorStore;
+  // relationship store for edge rows (same namespace scheme)
+  graphStore: IGraphStore;
   // commit metadata + migration journal live alongside, owned by codeindex
   factory: DbConnectionFactory;
   repo: CommitRepository;
   // Postgres-only; the migration runner uses this to apply .sql files vs. just seed the schema_versions journal
   supportsSql: boolean;
-  // create the vector store's own table/dir before the first write (no-op on file)
-  ensureVectorSchema(): Promise<void>;
+  // create the stores' own tables/dirs before the first write (no-op on file)
+  ensureStoreSchemas(): Promise<void>;
 }
 
 export function wireWriter(config: CodeIndexConfig): WiredWriter {
@@ -42,21 +45,27 @@ export function wireWriter(config: CodeIndexConfig): WiredWriter {
         partitionDir: PARTITION_DIR,
         recordsFile: RECORDS_FILE,
       }),
+      graphStore: new FileGraphStore({ baseDir: config.fileDir, partitionDir: PARTITION_DIR }),
       factory: new FileConnectionFactory(config.fileDir),
       repo: new FileCommitRepositoryImpl(),
       supportsSql: false,
-      ensureVectorSchema: async () => undefined,
+      ensureStoreSchemas: async () => undefined,
     };
   }
-  // share one pool between the vector store and the commit/migration factory; cli ends it once
+  // share one pool between the stores and the commit/migration factory; cli ends it once
   const factory = new PgConnectionFactory(config.connectionString);
   const vectorStore = new PgVectorStore(factory);
+  const graphStore = new PgGraphStore(factory);
   return {
     vectorStore,
+    graphStore,
     factory,
     repo: new PgCommitRepositoryImpl(),
     supportsSql: true,
-    ensureVectorSchema: () => vectorStore.ensureSchema(),
+    ensureStoreSchemas: async () => {
+      await vectorStore.ensureSchema();
+      await graphStore.ensureSchema();
+    },
   };
 }
 

@@ -8,8 +8,8 @@
 //     commits/
 //       <commitSha>/
 //         commit.json          { commitSha, branch, repository, indexedAt, embedModel, ... }
-//         chunks.jsonl         (owned by FileVectorStore)
-//         edges.jsonl          one CodeEdge per line: { from, to, type, line }
+//         chunks.jsonl         (owned by @peritze/vectorstore's FileVectorStore)
+//         edges.jsonl          (owned by @peritze/graphstore's FileGraphStore)
 //
 // All operations are direct file I/O — no batching, no transactions. The
 // connection arg is only used to recover the baseDir.
@@ -25,7 +25,7 @@ import { resolve, join } from 'node:path';
 
 import type { DbConnection } from '../types.js';
 import type { AppliedMigration, CommitRepository } from '../pgRepository.js';
-import type { CodeEdge, CommitRow } from '../../types.js';
+import type { CommitRow } from '../../types.js';
 import { FileConnection } from './fileConnectionFactory.js';
 
 interface SchemaVersionEntry {
@@ -91,14 +91,6 @@ export class FileCommitRepositoryImpl implements CommitRepository {
       chunkCount: commit.chunkCount,
     };
     writeFileSync(commitJsonPath(base, commit.commitSha), JSON.stringify(data, null, 2) + '\n', 'utf-8');
-  }
-
-  async writeEdges(conn: DbConnection, commitSha: string, edges: CodeEdge[]): Promise<void> {
-    const base = baseOf(conn);
-    const dir = commitDir(base, commitSha);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    const lines = edges.map(edge => JSON.stringify(edge)).join('\n');
-    writeFileSync(join(dir, 'edges.jsonl'), lines.length > 0 ? lines + '\n' : '', 'utf-8');
   }
 }
 

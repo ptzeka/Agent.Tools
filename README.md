@@ -12,6 +12,7 @@ Standalone MCP servers and AI-agent tooling, organized as an npm-workspaces mono
 | [mcp-tool-server](mcp-tool-server/) | Shared MCP server plumbing used by the servers above. |
 | [vectorizer](vectorizer/) | Embedding tier — turns text chunks into vectors. |
 | [vectorstore](vectorstore/) | Vector storage tier — file-backed and Postgres-backed stores. |
+| [graphstore](graphstore/) | Relationship storage tier — typed code edges (imports/calls/implements/extends) with file and Postgres backends. |
 
 ## Quick start
 
@@ -33,4 +34,5 @@ See [INSTALL.md](INSTALL.md) for the full setup: build → index → link → re
 
 - `npm run build` / `npm test` / `npm run clean` — run across all workspaces
 - `npm run link:cli` — link `codemcp`, `codeindex`, `memomcp` bin shims globally
-- [scripts/](scripts/) — helpers to publish or clear the code index
+- `npm run index:publish` / `npm run index:clear` — publish or clear code-index snapshots ([scripts/](scripts/))
+- `npm run verify` — end-to-end setup check (built → linked → indexed → probes answer)

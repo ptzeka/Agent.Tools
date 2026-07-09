@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import type { CodeIndexConfig } from '../config.js';
 import type { DbConnectionFactory, IVectorStore, VectorRecord } from '@peritze/vectorstore';
+import type { IGraphStore } from '@peritze/graphstore';
 import type { CommitRepository } from '../db/pgRepository.js';
 import type { IVectorService } from '@peritze/vectorizer';
 import type { CodeEdge, CommitRow, RawChunk } from '../types.js';
@@ -9,6 +10,7 @@ import { walkRepository } from '../indexer/walker.js';
 import { chunkFile } from '../indexer/chunkers/index.js';
 import { areaForPath, claudeMdLineageForFile, languageForPath } from '../indexer/metadata.js';
 import { readGitContext } from './git.js';
+import { discoverWorkspacePackages, resolveWorkspaceEdges } from './workspaceResolution.js';
 import type { IParser } from '../indexer/parsers/types.js';
 
 const EMBED_BATCH_SIZE = 32;
@@ -26,6 +28,7 @@ export interface PublishResult {
 export interface PublishDeps {
   config: CodeIndexConfig;
   vectorStore: IVectorStore;
+  graphStore: IGraphStore;
   factory: DbConnectionFactory;
   repo: CommitRepository;
   embedder: IVectorService;
@@ -34,7 +37,7 @@ export interface PublishDeps {
 }
 
 export async function publish(deps: PublishDeps): Promise<PublishResult> {
-  const { config, vectorStore, factory, repo, embedder, parser } = deps;
+  const { config, vectorStore, graphStore, factory, repo, embedder, parser } = deps;
   const log = deps.log ?? (() => undefined);
 
   const rootDir = resolve(config.rootDir);
@@ -45,7 +48,7 @@ export async function publish(deps: PublishDeps): Promise<PublishResult> {
   log(`walked ${files.length} indexable files`);
 
   const rawChunks: RawChunk[] = [];
-  const edges: CodeEdge[] = [];
+  let edges: CodeEdge[] = [];
   for (const file of files) {
     const language = languageForPath(file.relativePath);
     const area = areaForPath(file.relativePath);
@@ -63,6 +66,13 @@ export async function publish(deps: PublishDeps): Promise<PublishResult> {
     }
   }
   log(`produced ${rawChunks.length} raw chunks, ${edges.length} edges`);
+
+  const workspacePackages = discoverWorkspacePackages(rootDir);
+  if (workspacePackages.length > 0) {
+    const resolution = resolveWorkspaceEdges(edges, rawChunks, workspacePackages);
+    edges = resolution.edges;
+    log(`resolved ${resolution.resolvedCount} cross-package edges via ${workspacePackages.length} workspace package(s)`);
+  }
 
   const records: VectorRecord[] = [];
   for (let i = 0; i < rawChunks.length; i += EMBED_BATCH_SIZE) {
@@ -98,9 +108,9 @@ export async function publish(deps: PublishDeps): Promise<PublishResult> {
   // deleteNamespace clears the dir, so commit metadata must be written afterwards
   await vectorStore.deleteNamespace(commit.commitSha);
   await vectorStore.upsert(records);
+  await graphStore.replaceNamespace(commit.commitSha, edges);
   await factory.withTransaction(async conn => {
     await repo.upsertCommit(conn, commit);
-    await repo.writeEdges(conn, commit.commitSha, edges);
   });
 
   log(`published ${records.length} chunks + ${edges.length} edges for ${commit.commitSha} (${commit.repository}) using ${embedder.modelId}`);

@@ -72,8 +72,8 @@ async function verifySchema(
     throw new Error(
       `codemcp refuses to start${label}: no migrations have been applied (missing or empty ` +
       `schema_versions.json / commits table). ` +
-      `From the monorepo: \`cd tools/codeindex && npm run migrate:file && npm run publish:file\` ` +
-      `(writes tools/codeindex/data/). Name-only \`--repository\` reads that folder automatically when present.`,
+      `From the repo root: \`cd codeindex && npm run publish:file\` ` +
+      `(writes codeindex/data/). Name-only \`--repository\` reads that folder automatically when present.`,
     );
   }
   if (latest < expected) {

@@ -6,7 +6,7 @@ import type { IMetadataRepository } from './metadata/types.js';
 import { PgMetadataRepository } from './metadata/pgMetadataRepository.js';
 import { FileMetadataRepository } from './metadata/fileMetadataRepository.js';
 import type { IEdgeRepository } from './edges/types.js';
-import { FileEdgeRepository, NoEdgeRepository } from './edges/fileEdgeRepository.js';
+import { FileEdgeRepository, PgEdgeRepository } from './edges/fileEdgeRepository.js';
 
 // repo-first layout: each repository's data lives under data/<owner>/<repo>/, snapshots under
 // commits/<sha>/chunks.jsonl — mirrors what codeindex publishes through the same file backend
@@ -33,7 +33,7 @@ export function wireReader(config: CodeMcpConfig): WiredReader {
   return {
     retrieval: new CodeRetrieval(new PgVectorStore(config.connectionString)),
     metadata: new PgMetadataRepository(config.connectionString),
-    edges: new NoEdgeRepository(),
+    edges: new PgEdgeRepository(config.connectionString),
   };
 }
 
