@@ -1,0 +1,29 @@
+{
+  "name": "agent-tools",
+  "version": "0.1.0",
+  "description": "Standalone agent tooling: codemcp (code search MCP), memomcp (agent memory MCP), codeindex (repo indexer), and the vectorizer/vectorstore tiers beneath them (npm workspaces root).",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "mcp-tool-server",
+    "vectorizer",
+    "vectorstore",
+    "codeindex",
+    "codemcp",
+    "memomcp"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present",
+    "link:cli": "npm link -w @peritze/codemcp -w @peritze/codeindex -w @peritze/memomcp",
+    "unlink:cli": "npm rm -g @peritze/codemcp @peritze/codeindex @peritze/memomcp"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

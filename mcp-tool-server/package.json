@@ -1,0 +1,23 @@
+{
+  "name": "@peritze/mcp-tool-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "One stdio MCP server hosting a fixed tool set: shared ListTools/CallTool semantics and shutdown behavior for the codemcp/memomcp server family.",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./tool-server": { "types": "./dist/tool-server.d.ts", "default": "./dist/tool-server.js" },
+    "./tooldescriptor": { "types": "./dist/tooldescriptor.d.ts", "default": "./dist/tooldescriptor.js" }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
