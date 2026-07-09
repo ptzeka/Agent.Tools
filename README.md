@@ -25,7 +25,7 @@ npm test
 
 ## Installation & MCP registration
 
-See [INSTALL.md](INSTALL.md) for the full setup: build → index → link → register → skills → verify.
+See [INSTALL.md](INSTALL.md) for the full setup: build → index → link → register → verify, plus a usage guide for each server's MCP tools.
 
 [mcpServers.json](mcpServers.json) is the repo-scoped MCP registration template (launches the servers via `npx @peritze/...` with cwd = this repo).
 
