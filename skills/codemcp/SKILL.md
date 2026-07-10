@@ -5,74 +5,71 @@ description: Operate codemcp end-to-end as an AI agent — (re)index a repositor
 
 # codemcp: index a repository & validate the server
 
-codemcp/codeindex live in the standalone **agent.tools** monorepo (`TOOLS_ROOT`,
-this machine: `/Applications/WWW/Agent.Tools`). Paths below (`REPO_ROOT`, `INDEX_DATA`) come from
-the repo-root `deps.md` (machine-local, gitignored) — read it first. If it is
-missing: `REPO_ROOT` = this repo's root, `INDEX_DATA` = `TOOLS_ROOT/codeindex/data`.
+The `codeindex`, `codemcp`, and `memomcp` CLIs are globally npm-linked bare
+shims — they run from **any** cwd and always resolve to the linked agent.tools
+checkout. Never invoke them via `npx`: the `@peritze/*` packages are not
+published to a registry, so `npx @peritze/codeindex` 404s from any cwd outside
+that checkout (and bare `npx codeindex` would fetch an unrelated public
+package). If a shim is missing (`npm ls -g @peritze/codeindex` fails), it must
+be linked from the agent.tools checkout: `npm install && npm run build &&
+npm run link:cli` there — see that repo's INSTALL.md.
 
 ## Index a repository
 
-1. Ensure codeindex is built and globally linked: `npm ls -g @peritze/codeindex` succeeds,
-   else `npm run build --workspace=codeindex && npm run link:cli` from `TOOLS_ROOT`.
-2. Publish a snapshot of the current commit — preferred form (works from any cwd,
-   and pre-cleans an existing snapshot of the same sha so a re-publish never
-   merges with stale chunks):
+1. Confirm the shim is linked: `npm ls -g @peritze/codeindex` succeeds.
+2. Publish a snapshot of the current commit — from any cwd:
    ```bash
-   cd <TOOLS_ROOT> && npm run index:publish -- --root <REPO_ROOT>
+   codeindex --backend file publish --root <REPO_ROOT> [--repository <owner/name>] [--branch <name>]
    ```
-   The globally-linked bare shim also works from **any** cwd:
-   ```bash
-   codeindex --backend file publish --root <REPO_ROOT> [--repository <owner/name>]
-   ```
-   but it does NOT pre-clean: when re-publishing a commit sha that already has a
-   snapshot, delete `INDEX_DATA/<owner>/<repo>/commits/<sha>/` first (the file
-   backend appends to `chunks.jsonl`). Never use `npx` for the global form —
-   npm ≥7 npx resolves local `node_modules` then the registry, it does not fall
-   back to global links, so `npx @peritze/codeindex` only works with cwd inside
-   `TOOLS_ROOT` (and bare `npx codeindex` would fetch an unrelated registry package).
-3. The publish output echoes `commitSha`, `fileCount`, `chunkCount`, `edgeCount` —
-   treat a publish without that JSON as failed.
-4. Reindexing after commits is the same command; the layout is repo-first, so each
-   commit sha gets its own snapshot under `INDEX_DATA/<owner>/<repo>/commits/<sha>/`
-   (`chunks.jsonl` + `commit.json` + `edges.jsonl`, journal at
-   `INDEX_DATA/<owner>/<repo>/schema_versions.json`).
+   `<REPO_ROOT>` is the root of the repository being indexed (usually the cwd's
+   repo root). Publish does NOT pre-clean: re-publishing a commit sha that
+   already has a snapshot appends to its `chunks.jsonl`. To re-publish cleanly,
+   clear that repository first (see below), then publish.
+3. The publish output echoes `commitSha`, `fileCount`, `chunkCount`,
+   `edgeCount` — treat a publish without that JSON as failed.
+4. Reindexing after new commits is the same command; the layout is repo-first,
+   so each commit sha gets its own snapshot.
 
 Notes:
-- The index is per-commit: query results always carry the sha they came from. If
-  `resolveCommit` complains about multiple snapshots, pass `commit` explicitly.
+- The index is per-commit: query results always carry the sha they came from.
+  If `resolveCommit` complains about multiple snapshots, pass `commit`
+  explicitly.
 - `repository` ids are full ids (e.g. `owner/name`, or the registered
   multi-repo name) — never the bare repo folder name. When unsure, call
   `list_commits` first and copy the `repository=` value it prints.
-- A checksum-mismatch error from the migration journal means the repo's
-  `schema_versions.json` predates a changed migration; the store is disposable —
-  clear that repo (`npm run index:clear -- --repo <owner>/<name> --yes` from
-  `TOOLS_ROOT`, or delete its subtree under `INDEX_DATA`) and republish.
-- To delete a repository's indexed data (commits, chunks, edges) without a full
-  wipe, use codeindex's own `clear` command — works from any cwd via the global
-  shim, and refuses to guess the target: `codeindex --repository <owner/name>
-  clear --yes`. The root `npm run index:clear` script does the same thing by
-  directly deleting under `INDEX_DATA`; prefer `codeindex clear` for scripting.
+- To delete a repository's indexed data (commits, chunks, edges), use
+  codeindex's own `clear` command — works from any cwd and refuses to guess
+  the target:
+  ```bash
+  codeindex --repository <owner/name> clear --yes
+  ```
+- A checksum-mismatch error from the migration journal means the repository's
+  `schema_versions.json` predates a changed migration; the store is
+  disposable, but `codeindex clear` is NOT enough — it deletes commits yet
+  leaves `schema_versions.json` in place, so publish still fails. Delete the
+  repository's whole subtree under the codeindex data dir
+  (`<agent.tools checkout>/codeindex/data/<owner>/<repo>/`) and republish.
 
 ## Validate the MCP server is running
 
 Work top-down; the first failing check names the fix.
 
-1. **Registered?** the `codemcp` key exists in the global MCP config (`~/.claude.json`)
-   as `"command": "codemcp"` (the globally-linked shim — npx forms fail outside
-   `TOOLS_ROOT`; only `TOOLS_ROOT/mcpServers.json` uses `npx @peritze/codemcp`).
-2. **Linked?** `npm ls -g @peritze/codemcp` — missing means build codemcp and run
-   `npm run link:cli` from `TOOLS_ROOT`.
-3. **Indexed?** `ls <INDEX_DATA>/<owner>/<repo>/schema_versions.json
-   <INDEX_DATA>/<owner>/<repo>/commits` — missing means run the indexing section above.
-4. **Answers standalone?** (bypasses the host entirely; the bare shim works from any cwd)
+1. **Registered?** the `codemcp` key exists in the global MCP config
+   (`~/.claude.json`) as `"command": "codemcp"` — the globally-linked shim,
+   never an npx form or an absolute path.
+2. **Linked?** `npm ls -g @peritze/codemcp` — missing means link from the
+   agent.tools checkout (see top of this file).
+3. **Indexed & answers standalone?** (bypasses the host entirely; works from
+   any cwd)
    ```bash
    codemcp --backend file probe list_commits '{}'
    ```
-   Non-zero exit or an error means the server itself is broken; `codemcp tools`
-   lists valid tool names.
-5. **Answers live?** call `mcp__codemcp__list_commits` in the session — it must show
-   the snapshot you just published (matching sha). Tools absent → the host needs a
-   restart or the registration is malformed.
+   The target repository must appear with the expected commit sha — missing or
+   stale means run the indexing section above. A non-zero exit or an error
+   means the server itself is broken; `codemcp tools` lists valid tool names.
+4. **Answers live?** call `mcp__codemcp__list_commits` in the session — it must
+   show the snapshot you just published (matching sha). Tools absent → the host
+   needs a restart or the registration is malformed.
 
 ## Choosing a retrieval tool
 
