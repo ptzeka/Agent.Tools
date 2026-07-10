@@ -2,6 +2,11 @@
 
 Standalone MCP servers and AI-agent tooling, organized as an npm-workspaces monorepo.
 
+Used by the sibling repos in this workspace — [Agent.Local](../Agent.Local) (coding agent CLI,
+registers `codemcp`/`memomcp` as MCP servers), [Agent.Workflow](../Agent.Workflow) (auth/host/
+Temporal/web backend), and [Agent.Common](../Agent.Common) (shared primitives package) — but has
+no build-time dependency on any of them; it's consumed only via MCP registration or `npx`.
+
 ## Packages
 
 | Workspace | Purpose |
