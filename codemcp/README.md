@@ -1,6 +1,6 @@
 # codemcp
 
-Model Context Protocol server that exposes the [codeindex](../../tools/codeindex/) repository index to coding assistants (Claude Code, Cursor, any MCP-compatible client). Stdio transport. Backed by either PostgreSQL/pgvector or a local file directory — same interface, swap with one flag.
+Model Context Protocol server that exposes the [codeindex](../../tools/codeindex/) repository index to coding assistants (Claude Code, Cursor, any MCP-compatible client). Stdio transport. Backed by a local file directory behind the `IMetadataRepository`/`IEdgeRepository`/`IVectorStore` interfaces — a future backend implements those and plugs into `wiring.ts`.
 
 ## For AI assistants
 
@@ -22,30 +22,20 @@ Produces `dist/server.js`.
 node dist/server.js [global-options] <command>
 ```
 
-`process.cwd()` is the working directory for resolving the config file and `--file-dir`. There is no environment-variable fallback — every value has exactly one source (CLI flag, config file, or built-in default).
+`process.cwd()` is the working directory for resolving `--file-dir`. There is no environment-variable fallback — every value has exactly one source (CLI flag or built-in default).
 
 ### Global options
 
 | Flag | Default | Source priority | Notes |
 |---|---|---|---|
-| `-c, --config <path>` | `./codemcp.config.json` | CLI | Path to the config file (relative to cwd). |
-| `-b, --backend <pg\|file>` | `pg` | CLI | Storage backend. |
+| `-b, --backend <file>` | `file` | CLI | Storage backend. |
 | `--branch <name>` | `main` | CLI | Default branch to query when a tool call omits `commit`. |
 | `--embed-provider <local\|voyage\|openai>` | `local` | CLI | Must match the provider used at index time. |
 | `--embed-dim <n>` | `768` | CLI | Must match the indexed commit's dimensionality. |
-| `--pg-dsn <dsn>` | from config / built-in | CLI > config > default | Postgres connection string. Prefer the flag for secret injection. |
 | `--expected-migration <name>` | `001_init.sql` | CLI | Refuse startup if the backend's latest applied migration is older. |
-| `--repository <name>` or `<name:path>` | (none) | CLI | File backend: **`owner/name` only** → data under `tools/codemcp/data/{name}/` (relative to the codemcp package). **`owner/name:absPath`** → `{path}/.codemcp/data/{name}/`. Repeat the flag, **or** pass several entries in one value separated by **`;`**. **Omit entirely** to auto-register every distinct `repository` id found under the default file index (`tools/codeindex/data` when present, else `tools/codemcp/data`). First registration is the fallback default when git `origin` does not match any registered name. |
+| `--repository <name>` or `<name:path>` | (none) | CLI | **`owner/name` only** → data under `tools/codemcp/data/{name}/` (relative to the codemcp package). **`owner/name:absPath`** → `{path}/.codemcp/data/{name}/`. Repeat the flag, **or** pass several entries in one value separated by **`;`**. **Omit entirely** to auto-register every distinct `repository` id found under the default file index (`tools/codeindex/data` when present, else `tools/codemcp/data`). First registration is the fallback default when git `origin` does not match any registered name. |
 
-The file backend reads indexed JSON from disk: either **`tools/codemcp/data/{repository}/...`** when you pass **`--repository owner/name`** (name only), or **`{clone}/.codemcp/data/{repository}/...`** when you pass **`--repository owner/name:/absolute/clone`**. There is no `--file-dir` flag.
-
-Only `connectionString` lives in the optional `codemcp.config.json` file:
-
-```json
-{
-  "connectionString": "postgres://codeindex_user:CHANGE_ME@localhost:5432/codeindex"
-}
-```
+The server reads indexed JSON from disk: either **`tools/codemcp/data/{repository}/...`** when you pass **`--repository owner/name`** (name only), or **`{clone}/.codemcp/data/{repository}/...`** when you pass **`--repository owner/name:/absolute/clone`**. There is no `--file-dir` flag.
 
 ## Commands
 
@@ -54,14 +44,11 @@ Only `connectionString` lives in the optional `codemcp.config.json` file:
 Starts the stdio MCP server. This is what Claude Code launches.
 
 ```bash
-# Postgres backend
-node dist/server.js --backend pg --pg-dsn "postgres://user:pw@host/db"
-
-# File backend — simplest: no --repository; discovers every repo id in tools/codeindex/data (after publish)
-cd <repo-root>/tools/codemcp && node dist/server.js --backend file
+# simplest: no --repository; discovers every repo id in tools/codeindex/data (after publish)
+cd <repo-root>/tools/codemcp && node dist/server.js
 
 # Or pin one or more names explicitly:
-cd <repo-root>/tools/codemcp && node dist/server.js --backend file --repository Platform/Rxo.Platform.Web.Sandbox
+cd <repo-root>/tools/codemcp && node dist/server.js --repository Platform/Rxo.Platform.Web.Sandbox
 # Populate tools/codemcp/data/Platform/Rxo.Platform.Web.Sandbox/ from codeindex output first (unless using shared codeindex/data).
 ```
 
@@ -72,7 +59,7 @@ The server reads JSON-RPC from stdin, writes responses to stdout, and prints sta
 Invoke a single tool from the command line without an MCP client. **One-shot — not an interactive prompt.** The process starts, runs the tool, prints to stdout, and exits.
 
 ```
-node dist/server.js --backend file --branch <branch> probe <tool> <json-args>
+node dist/server.js --branch <branch> probe <tool> <json-args>
 ```
 
 The JSON argument needs **shell-specific quoting**:
@@ -86,20 +73,20 @@ The JSON argument needs **shell-specific quoting**:
 Example (bash):
 
 ```bash
-node dist/server.js --backend file --branch main \
+node dist/server.js --branch main \
   probe search_code '{"query":"connection factory","k":5}'
 ```
 
 Example (PowerShell):
 
 ```powershell
-node dist/server.js --backend file --branch main `
+node dist/server.js --branch main `
   probe search_code '{\"query\":\"connection factory\",\"k\":5}'
 ```
 
 > Why: PowerShell 5.1 strips embedded `"` characters during the argv handoff to native executables. Backslash-escaping the inner quotes is the canonical workaround.
 
-In the tool reference below, each "probe example" block shows both bash and PowerShell forms. Prepend `node dist/server.js --backend <pg|file> --branch <branch>` to get the full command.
+In the tool reference below, each "probe example" block shows both bash and PowerShell forms. Prepend `node dist/server.js --branch <branch>` to get the full command.
 
 ### `tools`
 
@@ -129,21 +116,17 @@ The first line is a **resolution header** showing exactly which slice of the ind
 
 A single backend can hold commits from multiple repositories. Every commit row carries a `repository` identifier (e.g. `owner/repo` from the indexer, or a path-based id), set at publish time.
 
-**File backend — multiple `--repository name:path` flags (or one flag with `name:path` pairs separated by `;`), or auto-discovery:**
+Multiple `--repository name:path` flags (or one flag with `name:path` pairs separated by `;`), or auto-discovery:
 
 - With **explicit** registrations, each gets its own on-disk reader; **all are searchable** by passing the tool argument `repository` equal to that registration's **`name`** (the part before the first `:` in each pair).
 - With **no** `--repository` flags and a migrated file index (`schema_versions.json` under the default data dir), the server **scans published commits** and registers every distinct `repository` field (same as listing each name with `--repository`). All share one physical tree when using sibling `tools/codeindex/data`.
 - **`search_code`**, **`get_symbol`**, and **`get_file_context`** query **one** repo per call. If you omit `repository`, they use **git `origin`** when it matches a registered name, else the **first** registration (explicit order or sorted discovery order).
 - **`list_commits`** with no `repository` filter **aggregates** every registered repo (sorted by `indexed_at`); pass `repository` to narrow to one name.
 
-**Postgres backend:** one connection; multiple logical repos live in the same DB and are distinguished by the `repository` column. Pass `repository` on tool calls to target the right rows.
-
-**When no `--repository` flags are passed (file backend):**
+**When no `--repository` flags are passed:**
 
 - If `schema_versions.json` exists under the default file index directory, **every distinct `repository` id** in published `commit.json` files is registered automatically (see above).
 - Otherwise (legacy single-tree layout): the server **auto-detects** a default from `git config --get remote.origin.url` in `process.cwd()` when possible. If detection fails, tools that need a repo may refuse until you pass `repository` explicitly.
-
-**Postgres / file with no migrated index:** same as before — git-origin default when possible.
 
 ---
 
@@ -193,12 +176,12 @@ Exact-match symbol lookup. **Prefer this over `grep` for known symbol names.** F
 
 ```bash
 # bash / zsh / git-bash
-probe get_symbol '{"name":"PgConnectionFactory"}'
+probe get_symbol '{"name":"FileConnectionFactory"}'
 ```
 
 ```powershell
 # PowerShell
-probe get_symbol '{\"name\":\"PgConnectionFactory\"}'
+probe get_symbol '{\"name\":\"FileConnectionFactory\"}'
 ```
 
 ---
@@ -208,7 +191,7 @@ probe get_symbol '{\"name\":\"PgConnectionFactory\"}'
 Relationship edges for an entity, read from the per-commit `edges.jsonl` graph the
 indexer publishes beside `chunks.jsonl`: **who calls / imports / implements / extends X**
 (incoming) and what X calls / imports / implements / extends (outgoing). AST-extracted
-for TS/JS (file backend only); vector search cannot answer these questions.
+for TS/JS; vector search cannot answer these questions.
 
 Edge endpoints are stable entity ids — `<path>` (file), `<path>#Symbol`,
 `<path>#Class.method`, `external:<module>#<name>`, `unresolved:<name>` — so the graph
@@ -254,12 +237,12 @@ Returns every chunk for a given file, plus the governing `CLAUDE.md` files. **Pr
 
 ```bash
 # bash / zsh / git-bash
-probe get_file_context '{"path":"src/codemcp/src/db/connectionFactory.ts"}'
+probe get_file_context '{"path":"codeindex/src/db/file/fileConnectionFactory.ts"}'
 ```
 
 ```powershell
 # PowerShell
-probe get_file_context '{\"path\":\"src/codemcp/src/db/connectionFactory.ts\"}'
+probe get_file_context '{\"path\":\"codeindex/src/db/file/fileConnectionFactory.ts\"}'
 ```
 
 ---
@@ -293,7 +276,7 @@ probe list_commits '{\"branch\":\"main\",\"limit\":5}'
 Configure **`codemcp` in `~/.cursor/mcp.json`** (user MCP). Example:
 
 - **`args`**: start with the **absolute** path to `tools/codemcp/dist/server.js` (Cursor sometimes runs MCP with `cwd` under your home directory, so a repo-relative path resolves to `/Users/you/tools/...` and fails).
-- **`cwd`**: `.../tools/codemcp` so optional `codemcp.config.json` next to the package resolves predictably.
+- **`cwd`**: `.../tools/codemcp` so name-only `--repository` resolves the sibling `tools/codeindex/data` predictably.
 
 See [mcp.json.example](./mcp.json.example). Run `npm install && npm run build` under `tools/codemcp` after upgrades, ensure **`tools/codeindex/data/`** exists with migrations + commits (see below), then reload MCP.
 
@@ -310,39 +293,20 @@ If you keep index files only under `tools/codemcp/data/<owner>/<repo>/` instead,
 
 ```bash
 # Refresh the index (from tools/codeindex):
-npm run migrate:file && npm run publish:file
+npm run migrate && npm run publish
 ```
 
 ## Wiring into Claude Code
 
-Copy a block from [mcp.json.example](./mcp.json.example) into your `.claude/mcp.json` under `mcpServers`. Two ready-to-paste variants are included — one for the file backend (local debug), one for Postgres.
+Copy a block from [mcp.json.example](./mcp.json.example) into your `.claude/mcp.json` under `mcpServers`.
 
 Once wired, Claude Code launches `codemcp` per session with the configured flags, and the four tools above become available for the model to call.
 
-## Backend selection at a glance
+## Storage location
 
-| Backend | When to use | Storage location |
-|---|---|---|
-| `pg` (default) | Production / shared index | PostgreSQL with `pgvector`. Schema managed by `codeindex migrate`. |
-| `file` | Local debug, no infra, grep-able artifacts | With **`--repository owner/name`**: `tools/codemcp/data/{name}/...`. With **`name:path`**: `{path}/.codemcp/data/{name}/...`. |
-
-Both implement the same `PgReaderRepository` interface; you can switch on a single invocation without rebuilding.
+With **`--repository owner/name`**: `tools/codemcp/data/{name}/...` (or the sibling `tools/codeindex/data/{name}/...` when it exists, see above). With **`name:path`**: `{path}/.codemcp/data/{name}/...`.
 
 ## See also
 
 - [tools/codeindex/](../../tools/codeindex/) — the indexer that produces the data this server reads.
 - [Dockerfile](./Dockerfile) — minimal node:20-alpine image.
-
-
-
-## COMMANDS 
-node src/codemcp/dist/server.js --backend file --branch feature/add_solution probe get_symbol '{"name":"PgConnectionFactory"}'
-node src/codemcp/dist/server.js --backend file --branch feature/add_solution probe get_file_context '{\"path\":\"src/codemcp/src/db/connectionFactory.ts\"}'
-node src/codemcp/dist/server.js --backend file --branch feature/add_solution probe get_symbol '{\"name\":\"PgConnectionFactory\"}'
-
-# Example do not delete:
-powershell.exe -ExecutionPolicy Bypass -File c:\www\agent.local\scripts\publish-codeindex.ps1 c:\www\agent.local
-
-rm -R tools/codeindex/data
-rm -R tools/codemcp/data
-cp -R tools/codeindex/data/. tools/codemcp/data/

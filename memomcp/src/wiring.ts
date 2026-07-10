@@ -1,4 +1,4 @@
-import { PgVectorStore, FileVectorStore, type IVectorStore } from '@peritze/vectorstore';
+import { FileVectorStore, type IVectorStore } from '@peritze/vectorstore';
 import { VectorService } from '@peritze/vectorizer';
 import type { MemoMcpConfig } from './config.js';
 import { MemoryRepository } from './memory/memoryRepository.js';
@@ -21,9 +21,8 @@ export function wire(config: MemoMcpConfig): Wired {
   return { repository: new MemoryRepository(store, embedder, reranker), store };
 }
 
+// the file backend is the only implementation today; a future backend adds a branch here
+// keyed on config.backend, returning its own IVectorStore implementation
 function wireStore(config: MemoMcpConfig): IVectorStore {
-  if (config.backend === 'file') {
-    return new FileVectorStore({ baseDir: config.baseDir, partitionDir: PARTITION_DIR, recordsFile: RECORDS_FILE });
-  }
-  return new PgVectorStore(config.connectionString);
+  return new FileVectorStore({ baseDir: config.baseDir, partitionDir: PARTITION_DIR, recordsFile: RECORDS_FILE });
 }

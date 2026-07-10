@@ -11,8 +11,8 @@ Standalone MCP servers and AI-agent tooling, organized as an npm-workspaces mono
 | [codeindex](codeindex/) | Repo indexer/publisher — chunks a repository (tree-sitter AST for TS/JS, regex fallback), embeds chunks, publishes per-commit snapshots. |
 | [mcp-tool-server](mcp-tool-server/) | Shared MCP server plumbing used by the servers above. |
 | [vectorizer](vectorizer/) | Embedding tier — turns text chunks into vectors. |
-| [vectorstore](vectorstore/) | Vector storage tier — file-backed and Postgres-backed stores. |
-| [graphstore](graphstore/) | Relationship storage tier — typed code edges (imports/calls/implements/extends) with file and Postgres backends. |
+| [vectorstore](vectorstore/) | Vector storage tier — a file-backed store behind a pluggable `IVectorStore` interface. |
+| [graphstore](graphstore/) | Relationship storage tier — typed code edges (imports/calls/implements/extends) behind a pluggable `IGraphStore` interface. |
 
 ## Quick start
 

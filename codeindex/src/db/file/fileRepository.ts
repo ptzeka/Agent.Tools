@@ -1,4 +1,4 @@
-// File-backed CommitRepository for the debug backend. Owns only the snapshot
+// File-backed CommitRepository. Owns only the snapshot
 // bookkeeping (commit.json) and the migration journal (schema_versions.json);
 // chunk lines (chunks.jsonl) are written by @peritze/vectorstore's
 // FileVectorStore, co-located in the same commits/<sha>/ directory:
@@ -20,11 +20,12 @@ import {
   writeFileSync,
   existsSync,
   readdirSync,
+  rmSync,
 } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 import type { DbConnection } from '../types.js';
-import type { AppliedMigration, CommitRepository } from '../pgRepository.js';
+import type { AppliedMigration, CommitRepository } from '../commitRepository.js';
 import type { CommitRow } from '../../types.js';
 import { FileConnection } from './fileConnectionFactory.js';
 
@@ -91,6 +92,17 @@ export class FileCommitRepositoryImpl implements CommitRepository {
       chunkCount: commit.chunkCount,
     };
     writeFileSync(commitJsonPath(base, commit.commitSha), JSON.stringify(data, null, 2) + '\n', 'utf-8');
+  }
+
+  // baseDir is already repo-scoped (data/<owner>/<repo>/), so `repository` is unused here —
+  // present only to satisfy the CommitRepository interface shared with other backends.
+  async listCommitShas(conn: DbConnection, _repository: string): Promise<string[]> {
+    return listCommitShas(baseOf(conn));
+  }
+
+  async deleteCommits(conn: DbConnection, _repository: string): Promise<void> {
+    const dir = resolve(baseOf(conn), 'commits');
+    rmSync(dir, { recursive: true, force: true });
   }
 }
 

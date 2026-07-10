@@ -1,14 +1,11 @@
 import {
-  PgConnectionFactory,
-  PgVectorStore,
   FileVectorStore,
   type DbConnectionFactory,
   type IVectorStore,
 } from '@peritze/vectorstore';
-import { FileGraphStore, PgGraphStore, type IGraphStore } from '@peritze/graphstore';
+import { FileGraphStore, type IGraphStore } from '@peritze/graphstore';
 import type { CodeIndexConfig } from './config.js';
-import type { CommitRepository } from './db/pgRepository.js';
-import { PgCommitRepositoryImpl } from './db/pgRepository.js';
+import type { CommitRepository } from './db/commitRepository.js';
 import { FileConnectionFactory } from './db/file/fileConnectionFactory.js';
 import { FileCommitRepositoryImpl } from './db/file/fileRepository.js';
 import type { IParser } from './indexer/parsers/types.js';
@@ -31,41 +28,27 @@ export interface WiredWriter {
   // commit metadata + migration journal live alongside, owned by codeindex
   factory: DbConnectionFactory;
   repo: CommitRepository;
-  // Postgres-only; the migration runner uses this to apply .sql files vs. just seed the schema_versions journal
+  // true only for a SQL-capable backend; the migration runner uses this to apply .sql files
+  // vs. just seeding the schema_versions journal (what the file backend does today)
   supportsSql: boolean;
   // create the stores' own tables/dirs before the first write (no-op on file)
   ensureStoreSchemas(): Promise<void>;
 }
 
+// the file backend is the only implementation today; a future backend adds a branch here
+// keyed on config.backend, wiring its own IVectorStore/IGraphStore/CommitRepository/DbConnectionFactory
 export function wireWriter(config: CodeIndexConfig): WiredWriter {
-  if (config.backend === 'file') {
-    return {
-      vectorStore: new FileVectorStore({
-        baseDir: config.fileDir,
-        partitionDir: PARTITION_DIR,
-        recordsFile: RECORDS_FILE,
-      }),
-      graphStore: new FileGraphStore({ baseDir: config.fileDir, partitionDir: PARTITION_DIR }),
-      factory: new FileConnectionFactory(config.fileDir),
-      repo: new FileCommitRepositoryImpl(),
-      supportsSql: false,
-      ensureStoreSchemas: async () => undefined,
-    };
-  }
-  // share one pool between the stores and the commit/migration factory; cli ends it once
-  const factory = new PgConnectionFactory(config.connectionString);
-  const vectorStore = new PgVectorStore(factory);
-  const graphStore = new PgGraphStore(factory);
   return {
-    vectorStore,
-    graphStore,
-    factory,
-    repo: new PgCommitRepositoryImpl(),
-    supportsSql: true,
-    ensureStoreSchemas: async () => {
-      await vectorStore.ensureSchema();
-      await graphStore.ensureSchema();
-    },
+    vectorStore: new FileVectorStore({
+      baseDir: config.fileDir,
+      partitionDir: PARTITION_DIR,
+      recordsFile: RECORDS_FILE,
+    }),
+    graphStore: new FileGraphStore({ baseDir: config.fileDir, partitionDir: PARTITION_DIR }),
+    factory: new FileConnectionFactory(config.fileDir),
+    repo: new FileCommitRepositoryImpl(),
+    supportsSql: false,
+    ensureStoreSchemas: async () => undefined,
   };
 }
 

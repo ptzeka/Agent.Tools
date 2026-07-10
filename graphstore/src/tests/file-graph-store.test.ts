@@ -22,7 +22,7 @@ afterEach(() => {
 
 describe("FileGraphStore", () => {
   it("round-trips edges through replaceNamespace and list", async () => {
-    const edges = [edge("a.ts", "b.ts#X"), edge("a.ts#Y", "external:pg", { type: "calls", line: 9 })];
+    const edges = [edge("a.ts", "b.ts#X"), edge("a.ts#Y", "external:zod", { type: "calls", line: 9 })];
     await store.replaceNamespace("sha1", edges);
     expect(await store.list("sha1")).toEqual(edges);
   });

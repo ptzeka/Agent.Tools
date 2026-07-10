@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import type { CodeIndexConfig } from '../config.js';
 import type { DbConnectionFactory, IVectorStore, VectorRecord } from '@peritze/vectorstore';
 import type { IGraphStore } from '@peritze/graphstore';
-import type { CommitRepository } from '../db/pgRepository.js';
+import type { CommitRepository } from '../db/commitRepository.js';
 import type { IVectorService } from '@peritze/vectorizer';
 import type { CodeEdge, CommitRow, RawChunk } from '../types.js';
 import { walkRepository } from '../indexer/walker.js';

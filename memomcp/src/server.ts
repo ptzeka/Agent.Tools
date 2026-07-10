@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { Command, Option } from 'commander';
 import { McpToolServer } from '@peritze/mcp-tool-server/tool-server';
-import { PgVectorStore } from '@peritze/vectorstore';
 
 import {
   loadConfig,
@@ -15,10 +14,6 @@ import { TOOLS, findTool, type ToolDeps } from './tools/registry.js';
 
 async function buildDeps(config: MemoMcpConfig): Promise<{ deps: ToolDeps; close: () => Promise<void> }> {
   const { repository, store } = wire(config);
-  // pg needs its table/extension before first use; the file backend creates dirs lazily
-  if (store instanceof PgVectorStore) {
-    await store.ensureSchema();
-  }
   if (config.embedProvider === 'local') {
     process.stderr.write(
       'memomcp: WARN embed-provider=local is a hashed bag-of-words — it cannot do paraphrase recall. ' +
@@ -105,22 +100,18 @@ const program = new Command();
 program
   .name('memomcp')
   .description('Model Context Protocol server exposing agent memory (remember/recall) over the shared vector store.')
-  .option('-c, --config <path>', 'path to memomcp.config.json (defaults to ./memomcp.config.json in cwd)')
-  .addOption(new Option('-b, --backend <backend>', 'storage backend').choices(['pg', 'file']).default('file'))
+  .addOption(new Option('-b, --backend <backend>', 'storage backend').choices(['file']).default('file'))
   .addOption(new Option('--embed-provider <provider>', 'embedding model provider').choices(['local', 'voyage', 'openai']).default('voyage'))
   .option('--embed-dim <n>', 'embedding dimensionality (must match the stored memories)', (v) => parseDim(v), 1024)
   .option('--collection <id>', 'default collection id when a call omits `collection`', 'default')
-  .option('--base-dir <path>', 'file-backend root holding memories/<collection>/records.jsonl')
-  .option('--pg-dsn <dsn>', 'Postgres connection string (overrides connectionString from the config file). Prefer this for secrets — pass it via the launching tool, do not commit.');
+  .option('--base-dir <path>', 'file-backend root holding memories/<collection>/records.jsonl');
 
 interface RawOpts {
-  config?: string;
   backend: Backend;
   embedProvider: EmbedProvider;
   embedDim: number;
   collection: string;
   baseDir?: string;
-  pgDsn?: string;
 }
 
 function readOverrides(): CliOverrides {
@@ -131,9 +122,7 @@ function readOverrides(): CliOverrides {
     embedDim: opts.embedDim,
     defaultCollection: opts.collection,
   };
-  if (opts.config !== undefined) overrides.configPath = opts.config;
   if (opts.baseDir !== undefined) overrides.baseDir = opts.baseDir;
-  if (opts.pgDsn !== undefined) overrides.pgDsn = opts.pgDsn;
   return overrides;
 }
 

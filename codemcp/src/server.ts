@@ -206,12 +206,10 @@ const program = new Command();
 program
   .name('codemcp')
   .description('Model Context Protocol server exposing the codeindex store to coding assistants.')
-  .option('-c, --config <path>', 'path to codemcp.config.json (defaults to ./codemcp.config.json in cwd)')
-  .addOption(new Option('-b, --backend <backend>', 'storage backend').choices(['pg', 'file']).default('pg'))
+  .addOption(new Option('-b, --backend <backend>', 'storage backend').choices(['file']).default('file'))
   .option('--branch <branch>', 'default branch to query', 'main')
   .addOption(new Option('--embed-provider <provider>', 'embedding model provider').choices(['local', 'voyage', 'openai']).default('local'))
   .option('--embed-dim <n>', 'embedding dimensionality (must match the indexed commit)', (v) => parseDim(v), 768)
-  .option('--pg-dsn <dsn>', 'Postgres connection string (overrides connectionString from the config file). Prefer this for secrets — pass it via the launching tool, do not commit.')
   .option('--expected-migration <name>', 'minimum applied migration the server requires at startup', '002_add_repository.sql')
   .option(
     '--repository <nameOrName:path>',
@@ -225,19 +223,17 @@ program
   );
 
 interface RawOpts {
-  config?: string;
   backend: Backend;
   branch: string;
   embedProvider: EmbedProvider;
   embedDim: number;
-  pgDsn?: string;
   expectedMigration: string;
   repository: RepositoryEntry[];
 }
 
 function readOverrides(): CliOverrides {
   const opts = program.opts<RawOpts>();
-  const overrides: CliOverrides = {
+  return {
     backend: opts.backend,
     branch: opts.branch,
     embedProvider: opts.embedProvider,
@@ -245,9 +241,6 @@ function readOverrides(): CliOverrides {
     expectedMigration: opts.expectedMigration,
     repositories: opts.repository,
   };
-  if (opts.config !== undefined) overrides.configPath = opts.config;
-  if (opts.pgDsn !== undefined) overrides.pgDsn = opts.pgDsn;
-  return overrides;
 }
 
 program

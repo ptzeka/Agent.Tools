@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Generic relationship store: IGraphStore over typed, directed edges { from, to, type, line } partitioned by namespace, with pg and per-namespace file backends. Takes entity ids as input; never parses.",
+  "description": "Generic relationship store: IGraphStore over typed, directed edges { from, to, type, line } partitioned by namespace, with a per-namespace file backend. Takes entity ids as input; never parses.",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
   },

@@ -1,6 +1,5 @@
-// barrel for `@peritze/vectorstore`: the generic store contract, its pg + file backends, and the shared db plumbing
+// barrel for `@peritze/vectorstore`: the generic store contract, its file backend, and the shared db
+// plumbing (DbConnection/DbConnectionFactory) that a future SQL-backed IVectorStore would implement against
 export * from './vector-store.js';
 export * from './db-types.js';
-export * from './pg-connection.js';
-export * from './pg-vector-store.js';
 export * from './file-vector-store.js';

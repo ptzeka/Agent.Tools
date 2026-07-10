@@ -3,7 +3,9 @@ import { Command, Option } from 'commander';
 import { loadConfig, repoScopedFileDir, type Backend, type CliOverrides, type CodeIndexConfig } from './config.js';
 import { MigrationRunner } from './publisher/migrate.js';
 import { publish } from './publisher/publish.js';
+import { clearRepository } from './publisher/clear.js';
 import { readGitContext } from './publisher/git.js';
+import { createInterface } from 'node:readline/promises';
 import { VectorService, type EmbedProvider } from '@peritze/vectorizer';
 import { wireWriter, wireParser } from './wiring.js';
 
@@ -24,7 +26,7 @@ const program = new Command();
 program
   .name('codeindex')
   .description(
-    'Chunk, embed, and publish a repository to PostgreSQL/pgvector for codemcp. ' +
+    'Chunk, embed, and publish a repository for codemcp. ' +
     'The directory being indexed is process.cwd() unless you pass --root <path> ' +
     '(path is resolved relative to cwd when relative).',
   )
@@ -36,11 +38,11 @@ program
     '-c, --config <path>',
     'path to codeindex.config.json (resolved against cwd; default file is <root>/codeindex.config.json when omitted)',
   )
-  .addOption(new Option('-b, --backend <backend>', 'storage backend').choices(['pg', 'file']).default('pg'))
+  .addOption(new Option('-b, --backend <backend>', 'storage backend').choices(['file']).default('file'))
   .option('--branch <branch>', 'branch name recorded on the commit row', 'main')
   .option('--repository <name>', 'override repository id stored on the commit row; when omitted, uses origin URL (owner/repo) if set, else the resolved absolute path of the index root')
   .addOption(new Option('--embed-provider <provider>', 'embedding model provider').choices(['local', 'voyage', 'openai']).default('local'))
-  .option('--embed-dim <n>', 'embedding dimensionality (must match the chunks.embedding column for pg backend)', (v) => parseDim(v), 768);
+  .option('--embed-dim <n>', 'embedding dimensionality (must match the stored chunks)', (v) => parseDim(v), 768);
 
 function parseDim(input: string): number {
   const n = Number(input);
@@ -134,6 +136,46 @@ program
         repo,
         embedder,
         parser: wireParser(),
+        log: (m) => process.stdout.write(`[codeindex] ${m}\n`),
+      });
+      process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    } finally {
+      await factory.end();
+    }
+  });
+
+program
+  .command('clear')
+  .description('Delete all indexed data (commits, chunks, edges) for one repository. Requires --repository; refuses to guess.')
+  .option('-y, --yes', 'skip the confirmation prompt (required when not a TTY)')
+  .action(async (opts: { yes?: boolean }) => {
+    const overrides = readOverrides();
+    if (!overrides.repository) {
+      throw new Error('clear requires --repository <owner/name> — refusing to guess which repository to delete');
+    }
+    const config = scopeFileDirToRepository(loadConfig(overrides));
+    const { vectorStore, graphStore, factory, repo, ensureStoreSchemas } = wireWriter(config);
+    try {
+      printContext(config);
+      await ensureStoreSchemas();
+      if (!opts.yes) {
+        if (!process.stdin.isTTY) {
+          throw new Error('not a TTY; pass --yes to confirm deletion non-interactively');
+        }
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const answer = (await rl.question(`Delete all indexed data for ${config.repository}? [y/N] `)).trim();
+        rl.close();
+        if (!/^y(es)?$/i.test(answer)) {
+          process.stdout.write('aborted; nothing removed\n');
+          return;
+        }
+      }
+      const result = await clearRepository({
+        repository: config.repository!,
+        vectorStore,
+        graphStore,
+        factory,
+        repo,
         log: (m) => process.stdout.write(`[codeindex] ${m}\n`),
       });
       process.stdout.write(JSON.stringify(result, null, 2) + '\n');

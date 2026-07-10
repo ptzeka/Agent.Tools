@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 
 import type { DbConnectionFactory } from '../db/types.js';
-import type { AppliedMigration, CommitRepository } from '../db/pgRepository.js';
+import type { AppliedMigration, CommitRepository } from '../db/commitRepository.js';
 
 const MIGRATION_LOCK_KEY = 7148291035;
 
@@ -23,7 +23,7 @@ export interface MigrationRunnerOptions {
   // path to the migrations directory; defaults to ../../migrations relative to this file
   migrationsDir?: string;
   // when false, record migrations as applied without running their SQL — for non-SQL backends
-  // (the debug file backend) so schema_versions stays in lockstep with what Postgres would have
+  // (the file backend) so schema_versions stays in lockstep with what a SQL backend would have recorded
   executeSql?: boolean;
 }
 

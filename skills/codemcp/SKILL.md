@@ -6,7 +6,7 @@ description: Operate codemcp end-to-end as an AI agent — (re)index a repositor
 # codemcp: index a repository & validate the server
 
 codemcp/codeindex live in the standalone **agent.tools** monorepo (`TOOLS_ROOT`,
-this machine: `c:\www\agent.tools`). Paths below (`REPO_ROOT`, `INDEX_DATA`) come from
+this machine: `/Applications/WWW/Agent.Tools`). Paths below (`REPO_ROOT`, `INDEX_DATA`) come from
 the repo-root `deps.md` (machine-local, gitignored) — read it first. If it is
 missing: `REPO_ROOT` = this repo's root, `INDEX_DATA` = `TOOLS_ROOT/codeindex/data`.
 
@@ -47,6 +47,11 @@ Notes:
   `schema_versions.json` predates a changed migration; the store is disposable —
   clear that repo (`npm run index:clear -- --repo <owner>/<name> --yes` from
   `TOOLS_ROOT`, or delete its subtree under `INDEX_DATA`) and republish.
+- To delete a repository's indexed data (commits, chunks, edges) without a full
+  wipe, use codeindex's own `clear` command — works from any cwd via the global
+  shim, and refuses to guess the target: `codeindex --repository <owner/name>
+  clear --yes`. The root `npm run index:clear` script does the same thing by
+  directly deleting under `INDEX_DATA`; prefer `codeindex clear` for scripting.
 
 ## Validate the MCP server is running
 

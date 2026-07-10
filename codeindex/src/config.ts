@@ -3,7 +3,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { EmbedProvider } from '@peritze/vectorizer';
 
-export type Backend = 'pg' | 'file';
+// the file backend is the only implementation today; a future SQL-backed store adds its id here
+export type Backend = 'file';
 
 // strict precedence with no env fallbacks or autodetection: CLI flags, then config file, then --root/cwd
 // file-backend data always lives at <package-root>/data (no --file-dir flag) to keep that backend simple
@@ -14,7 +15,6 @@ export interface CodeIndexConfig {
   embedDim: number;
   fileDir: string;
   rootDir: string;
-  connectionString: string;
   excludeGlobs: string[];
   // unset → publisher derives owner/repo from git remote, else the absolute rootDir
   repository?: string;
@@ -32,16 +32,14 @@ export interface CliOverrides {
 }
 
 interface ConfigFileShape {
-  connectionString?: string;
   excludeGlobs?: string[];
 }
 
 const DEFAULTS = {
-  backend: 'pg' as Backend,
+  backend: 'file' as Backend,
   branch: 'main',
   embedProvider: 'local' as EmbedProvider,
   embedDim: 768,
-  connectionString: 'postgres://codeindex_user:CHANGE_ME@localhost:5432/codeindex',
   excludeGlobs: [
     '**/node_modules/**',
     '**/dist/**',
@@ -93,7 +91,6 @@ export function loadConfig(overrides: CliOverrides = {}): CodeIndexConfig {
     embedDim: overrides.embedDim ?? DEFAULTS.embedDim,
     fileDir: defaultFileDir(),
     rootDir,
-    connectionString: fromFile.connectionString ?? DEFAULTS.connectionString,
     excludeGlobs: fromFile.excludeGlobs ?? DEFAULTS.excludeGlobs,
   };
   if (overrides.repository !== undefined) {

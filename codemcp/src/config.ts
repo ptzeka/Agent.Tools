@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,7 +6,8 @@ import type { EmbedProvider } from '@peritze/vectorizer';
 
 import { listIndexedRepositoryIds } from './metadata/fileMetadataRepository.js';
 
-export type Backend = 'pg' | 'file';
+// the file backend is the only implementation today; a future SQL-backed store adds its id here
+export type Backend = 'file';
 
 // registered at startup via --repository name or name:localPath; name is the owner/repo id used in commit.json
 export interface RepositoryEntry {
@@ -30,7 +31,7 @@ export function repoFileDir(entry: RepositoryEntry): string {
   return join(lp, '.codemcp', 'data', ...segments);
 }
 
-// CLI flags + config file (connectionString, also via --pg-dsn) resolved from cwd, no env fallbacks
+// CLI flags resolved from cwd, no env fallbacks
 export interface CodeMcpConfig {
   backend: Backend;
   branch: string;
@@ -39,33 +40,25 @@ export interface CodeMcpConfig {
   // legacy single-repo dir, used when no --repository flags are given
   fileDir: string;
   expectedMigration: string;
-  connectionString: string;
   // may be empty for backward-compat single-repo mode
   repositories: RepositoryEntry[];
 }
 
 export interface CliOverrides {
-  configPath?: string;
   backend?: Backend;
   branch?: string;
   embedProvider?: EmbedProvider;
   embedDim?: number;
-  pgDsn?: string;
   expectedMigration?: string;
   repositories?: RepositoryEntry[];
 }
 
-interface ConfigFileShape {
-  connectionString?: string;
-}
-
 const DEFAULTS = {
-  backend: 'pg' as Backend,
+  backend: 'file' as Backend,
   branch: 'main',
   embedProvider: 'local' as EmbedProvider,
   embedDim: 768,
   expectedMigration: '002_add_repository.sql',
-  connectionString: 'postgres://codeindex_user:CHANGE_ME@localhost:5432/codeindex',
 };
 
 export function packageRoot(): string {
@@ -140,18 +133,6 @@ export function parseRepositoryArgList(raw: string): RepositoryEntry[] {
 }
 
 export function loadConfig(overrides: CliOverrides = {}): CodeMcpConfig {
-  const cwd = process.cwd();
-
-  const configFilePath = overrides.configPath
-    ? resolve(cwd, overrides.configPath)
-    : resolve(cwd, 'codemcp.config.json');
-
-  let fromFile: ConfigFileShape = {};
-  if (existsSync(configFilePath)) {
-    const raw = readFileSync(configFilePath, 'utf-8');
-    fromFile = JSON.parse(raw) as ConfigFileShape;
-  }
-
   return {
     backend: overrides.backend ?? DEFAULTS.backend,
     branch: overrides.branch ?? DEFAULTS.branch,
@@ -159,7 +140,6 @@ export function loadConfig(overrides: CliOverrides = {}): CodeMcpConfig {
     embedDim: overrides.embedDim ?? DEFAULTS.embedDim,
     fileDir: defaultFileDir(),
     expectedMigration: overrides.expectedMigration ?? DEFAULTS.expectedMigration,
-    connectionString: overrides.pgDsn ?? fromFile.connectionString ?? DEFAULTS.connectionString,
     repositories: overrides.repositories ?? [],
   };
 }

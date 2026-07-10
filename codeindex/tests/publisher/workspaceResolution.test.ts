@@ -67,7 +67,7 @@ describe('resolveWorkspaceEdges', () => {
   });
 
   test('ignores nested symbols — imports bind top-level declarations only', () => {
-    const chunks = [chunk('vectorstore/src/a.ts', 'search', 'PgVectorStore')];
+    const chunks = [chunk('vectorstore/src/a.ts', 'search', 'FileVectorStore')];
     const edges = [edge('a.ts', 'external:@peritze/vectorstore#search')];
     expect(resolveWorkspaceEdges(edges, chunks, PACKAGES).resolvedCount).toBe(0);
   });

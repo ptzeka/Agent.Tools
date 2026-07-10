@@ -35,7 +35,7 @@ export async function listCommits(input: ListCommitsInput, deps: ToolDeps): Prom
     allRows.sort((a, b) => b.indexedAt.getTime() - a.indexedAt.getTime());
     rows = allRows.slice(0, input.limit);
   } else {
-    // Single backend (Postgres or single-repo file): use the primary reader.
+    // Single-repo file backend: use the primary reader.
     rows = await reader.metadata.listCommits(branchFilter, repositoryFilter, input.limit);
   }
 

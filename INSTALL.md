@@ -44,7 +44,10 @@ To index a **different** repository, pass its root:
 [codeindex.config.example.json](codeindex/codeindex.config.example.json).
 
 To wipe stale snapshots: `npm run index:clear` (add `-- --repo <owner>/<name>`
-to clear one repository, `-- --yes` to skip the prompt).
+to clear one repository, `-- --yes` to skip the prompt) — operates directly on
+`codeindex/data/`. From any cwd, use codeindex's own `clear` command instead:
+`codeindex --repository <owner/name> clear [--yes]` (deletes that repository's
+commits, chunks, and edges; refuses to run without `--repository`).
 
 memomcp needs no indexing step; its file backend creates
 `memomcp/data/memories/<collection>/records.jsonl` on first `remember`.
