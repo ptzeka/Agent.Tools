@@ -36,6 +36,10 @@ node dist/cli.js publish
 
 # ignore the incremental baseline and re-chunk + re-embed every file
 node dist/cli.js publish --full
+
+# clear everything stored for the current commit first, then re-index from scratch
+# (implies --full; the recovery path when a snapshot's metadata and data drift apart)
+node dist/cli.js publish --force
 ```
 
 Publishing is incremental when it can be: if a previously indexed commit exists

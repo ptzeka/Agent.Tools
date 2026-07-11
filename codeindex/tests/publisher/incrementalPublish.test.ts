@@ -232,6 +232,29 @@ describe('incremental publish', () => {
     expect(after.some(e => e.from.startsWith('alpha.ts') && e.to.startsWith('doomed.ts'))).toBe(true);
   });
 
+  it('force clears the stored snapshot and regenerates the whole commit', async () => {
+    const first = await publish(makeDeps());
+
+    // metadata/data drift: chunk data vanishes while commit.json survives, which
+    // a plain incremental publish would trust and silently produce a partial index
+    rmSync(join(dataDir, 'commits', first.commitSha, 'chunks.jsonl'));
+
+    embedder.embeddedTexts = [];
+    const second = await publish(makeDeps({ force: true }));
+
+    expect(second.mode).toBe('full');
+    expect(second.baselineSha).toBeUndefined();
+    expect(second.commitSha).toBe(first.commitSha);
+
+    const paths = embeddedPaths();
+    expect(paths.has('alpha.ts')).toBe(true);
+    expect(paths.has('beta.ts')).toBe(true);
+    expect(paths.has('doomed.ts')).toBe(true);
+    expect(await pathsInNamespace(second.commitSha)).toEqual(
+      new Set(['alpha.ts', 'beta.ts', 'doomed.ts']),
+    );
+  });
+
   it('deleting every file empties the snapshot incrementally', async () => {
     await publish(makeDeps());
 

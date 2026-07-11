@@ -124,7 +124,8 @@ program
     'changed since it are re-chunked and re-embedded; pass --full to force a from-scratch index.',
   )
   .option('--full', 'ignore any incremental baseline and re-index every file')
-  .action(async (opts: { full?: boolean }) => {
+  .option('--force', 'clear everything stored for the current commit, then re-index every file (implies --full)')
+  .action(async (opts: { full?: boolean; force?: boolean }) => {
     const config = scopeFileDirToRepository(loadConfig(readOverrides()));
     const { vectorStore, graphStore, factory, repo, supportsSql, ensureStoreSchemas } = wireWriter(config);
     const runner = new MigrationRunner(factory, repo, { executeSql: supportsSql });
@@ -142,6 +143,7 @@ program
         embedder,
         parser: wireParser(),
         full: opts.full === true,
+        force: opts.force === true,
         log: (m) => process.stdout.write(`[codeindex] ${m}\n`),
       });
       process.stdout.write(JSON.stringify(result, null, 2) + '\n');

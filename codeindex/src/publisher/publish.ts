@@ -41,6 +41,10 @@ export interface PublishDeps {
   parser: IParser;
   // force a from-scratch publish even when a valid diff baseline exists
   full?: boolean;
+  // clear everything stored for the current commit (chunks, edges, commit row)
+  // before re-indexing; implies `full`. The escape hatch for a snapshot whose
+  // metadata and data have drifted apart (e.g. hand-edited data dir)
+  force?: boolean;
   log?: (msg: string) => void;
 }
 
@@ -55,7 +59,18 @@ export async function publish(deps: PublishDeps): Promise<PublishResult> {
   const files = walkRepository({ rootDir, excludeGlobs: config.excludeGlobs });
   log(`walked ${files.length} indexable files`);
 
-  const baseline = deps.full ? null : await pickBaseline(deps, rootDir, git);
+  if (deps.force) {
+    // commit row goes first: if the rebuild crashes midway, no metadata is left
+    // claiming this commit is indexed, so the next run falls back to full
+    log(`force: clearing stored snapshot for ${git.commitSha}`);
+    await factory.withTransaction(async conn => {
+      await repo.deleteCommit(conn, git.commitSha);
+    });
+    await vectorStore.deleteNamespace(git.commitSha);
+    await graphStore.deleteNamespace(git.commitSha);
+  }
+
+  const baseline = deps.full || deps.force ? null : await pickBaseline(deps, rootDir, git);
   const outcome = baseline
     ? await publishIncremental(deps, rootDir, git, files, baseline)
     : await publishFull(deps, rootDir, git, files);
