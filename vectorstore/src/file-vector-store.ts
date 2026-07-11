@@ -124,6 +124,14 @@ export class FileVectorStore implements IVectorStore {
     if (changed) this.rewrite(namespace, folded);
   }
 
+  async copyNamespace(source: string, target: string): Promise<void> {
+    if (source === target) return;
+    // fold the source first so the target starts compacted (no duplicate-id history lines)
+    const folded = this.read(source);
+    if (folded.size === 0) return;
+    this.rewrite(target, remapNamespace(folded, target));
+  }
+
   async deleteNamespace(namespace: string): Promise<void> {
     rmSync(dirname(this.pathFor(namespace)), { recursive: true, force: true });
   }
@@ -211,6 +219,13 @@ function normalize(record: VectorRecord): VectorRecord {
     embedding: record.embedding,
     metadata: record.metadata ?? {},
   };
+}
+
+// copied records must carry the target namespace, or reads that trust record.namespace would lie
+function remapNamespace(folded: Map<string, VectorRecord>, namespace: string): Map<string, VectorRecord> {
+  const out = new Map<string, VectorRecord>();
+  for (const [id, record] of folded) out.set(id, { ...record, namespace });
+  return out;
 }
 
 // namespace is opaque, so encode it into one safe path segment; reject dot segments that could traverse

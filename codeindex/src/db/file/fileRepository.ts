@@ -100,6 +100,33 @@ export class FileCommitRepositoryImpl implements CommitRepository {
     return listCommitShas(baseOf(conn));
   }
 
+  async getCommit(conn: DbConnection, commitSha: string): Promise<CommitRow | null> {
+    const path = commitJsonPath(baseOf(conn), commitSha);
+    if (!existsSync(path)) return null;
+    let data: CommitJson;
+    try {
+      data = JSON.parse(readFileSync(path, 'utf-8')) as CommitJson;
+    } catch {
+      return null; // a torn commit.json means the snapshot is unusable as a baseline
+    }
+    return {
+      commitSha: data.commitSha,
+      branch: data.branch,
+      repository: data.repository,
+      indexedAt: data.indexedAt ? new Date(data.indexedAt) : undefined,
+      embedModel: data.embedModel,
+      embedDim: data.embedDim,
+      fileCount: data.fileCount,
+      chunkCount: data.chunkCount,
+    };
+  }
+
+  // removes only commit.json; the co-located chunks.jsonl/edges.jsonl belong to the
+  // vector/graph stores, whose deleteNamespace calls run alongside this in the publisher
+  async deleteCommit(conn: DbConnection, commitSha: string): Promise<void> {
+    rmSync(commitJsonPath(baseOf(conn), commitSha), { force: true });
+  }
+
   async deleteCommits(conn: DbConnection, _repository: string): Promise<void> {
     const dir = resolve(baseOf(conn), 'commits');
     rmSync(dir, { recursive: true, force: true });

@@ -118,8 +118,13 @@ program
 
 program
   .command('publish')
-  .description('Run migrations, then chunk + embed + upsert the current commit.')
-  .action(async () => {
+  .description(
+    'Run migrations, then chunk + embed + upsert the current commit. ' +
+    'When a previously indexed ancestor commit exists (same embed model), only files ' +
+    'changed since it are re-chunked and re-embedded; pass --full to force a from-scratch index.',
+  )
+  .option('--full', 'ignore any incremental baseline and re-index every file')
+  .action(async (opts: { full?: boolean }) => {
     const config = scopeFileDirToRepository(loadConfig(readOverrides()));
     const { vectorStore, graphStore, factory, repo, supportsSql, ensureStoreSchemas } = wireWriter(config);
     const runner = new MigrationRunner(factory, repo, { executeSql: supportsSql });
@@ -136,6 +141,7 @@ program
         repo,
         embedder,
         parser: wireParser(),
+        full: opts.full === true,
         log: (m) => process.stdout.write(`[codeindex] ${m}\n`),
       });
       process.stdout.write(JSON.stringify(result, null, 2) + '\n');

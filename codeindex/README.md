@@ -33,7 +33,19 @@ node dist/cli.js migrate
 
 # migrate + chunk + embed + write the current commit (idempotent per commit sha)
 node dist/cli.js publish
+
+# ignore the incremental baseline and re-chunk + re-embed every file
+node dist/cli.js publish --full
 ```
+
+Publishing is incremental when it can be: if a previously indexed commit exists
+that is HEAD or a git ancestor of HEAD (same embedding model + dim), only the
+files that differ from it — committed, staged, unstaged, or untracked — are
+re-chunked and re-embedded; everything else is carried over from that snapshot.
+Deleted/renamed files have their stale chunks and outgoing edges dropped. After
+a successful publish, superseded snapshots on the same branch are pruned so one
+snapshot per branch remains. No usable baseline (first publish, model change,
+diverged branch, no git) falls back to a full index automatically.
 
 `pack-and-publish` is an alias for `publish`. `clear --repository <owner/name>`
 deletes a repository's indexed data (commits, chunks, edges).

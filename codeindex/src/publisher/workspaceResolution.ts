@@ -9,6 +9,10 @@ import { join } from 'node:path';
 import type { CodeEdge, RawChunk } from '../types.js';
 import { symbolId } from '../indexer/parsers/entityIds.js';
 
+// the only chunk fields symbol resolution reads — the incremental publisher feeds
+// this from stored chunk summaries (no content on hand), the full path from RawChunk
+export type SymbolChunk = Pick<RawChunk, 'path' | 'symbol' | 'parentSymbol'>;
+
 export interface WorkspacePackage {
   /** package.json "name", e.g. "@peritze/vectorstore" */
   name: string;
@@ -63,7 +67,7 @@ function isDirectory(path: string): boolean {
 // guessing a wrong definition site.
 export function resolveWorkspaceEdges(
   edges: CodeEdge[],
-  chunks: RawChunk[],
+  chunks: SymbolChunk[],
   packages: WorkspacePackage[],
 ): { edges: CodeEdge[]; resolvedCount: number } {
   if (packages.length === 0) return { edges, resolvedCount: 0 };
@@ -84,7 +88,7 @@ export function resolveWorkspaceEdges(
 // symbol -> defining paths, per package, from top-level chunks only (imports
 // bind package-barrel exports, which are top-level declarations)
 function indexTopLevelSymbols(
-  chunks: RawChunk[],
+  chunks: SymbolChunk[],
   packages: WorkspacePackage[],
 ): Map<string, Map<string, Set<string>>> {
   const index = new Map<string, Map<string, Set<string>>>();

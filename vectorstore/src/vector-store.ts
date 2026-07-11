@@ -72,6 +72,10 @@ export interface IVectorStore {
     filter?: MetadataFilter,
   ): Promise<SearchHit[]>;
   delete(namespace: string, ids: string[]): Promise<void>;
+  // seeds `target` with a full copy of `source`'s records, embeddings included — the only
+  // read path that moves vectors between namespaces without re-embedding. Replaces any
+  // existing target content; a missing source leaves the target untouched
+  copyNamespace(source: string, target: string): Promise<void>;
   deleteNamespace(namespace: string): Promise<void>;
   listNamespaces(): Promise<string[]>;
   close(): Promise<void>;

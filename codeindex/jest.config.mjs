@@ -8,6 +8,7 @@ export default {
   moduleNameMapper: {
     // resolve shared workspace packages to TS source so tests need no prebuild
     "^@peritze/vectorstore$": "<rootDir>/../vectorstore/src/index.ts",
+    "^@peritze/graphstore$": "<rootDir>/../graphstore/src/index.ts",
     "^@peritze/vectorizer$": "<rootDir>/../vectorizer/src/index.ts",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },

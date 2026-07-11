@@ -1,11 +1,11 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { resolve, relative, join, sep, posix } from 'node:path';
-import { createRequire } from 'node:module';
+// `ignore` is a CommonJS factory with a dual-mode "exports" map; a default import
+// resolves in both the ESM build and Jest's CJS transform (createRequire +
+// import.meta.url would be a parse error under the latter)
+import ignoreDefault from 'ignore';
 
-const require = createRequire(import.meta.url);
-// `ignore` is a CommonJS factory; importing it via createRequire avoids the
-// NodeNext/ESM interop headaches around `module.exports = factory`.
-const ignoreFactory: () => IgnoreLike = require('ignore');
+const ignoreFactory = ignoreDefault as unknown as () => IgnoreLike;
 
 interface IgnoreLike {
   add(patterns: string | string[]): IgnoreLike;

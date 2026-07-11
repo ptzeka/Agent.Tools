@@ -21,5 +21,10 @@ export interface CommitRepository {
   upsertCommit(conn: DbConnection, commit: CommitRow): Promise<void>;
 
   listCommitShas(conn: DbConnection, repository: string): Promise<string[]>;
+  // the stored row for one snapshot, or null when the sha was never indexed; the incremental
+  // publisher reads branch/embedModel/embedDim/indexedAt off this to pick a diff baseline
+  getCommit(conn: DbConnection, commitSha: string): Promise<CommitRow | null>;
+  // drops one snapshot's commit row (chunks/edges are the stores' to delete, not this repo's)
+  deleteCommit(conn: DbConnection, commitSha: string): Promise<void>;
   deleteCommits(conn: DbConnection, repository: string): Promise<void>;
 }

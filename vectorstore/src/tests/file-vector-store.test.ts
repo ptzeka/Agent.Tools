@@ -205,6 +205,41 @@ describe("FileVectorStore namespace isolation", () => {
   });
 });
 
+describe("FileVectorStore copyNamespace", () => {
+  it("copies records with embeddings intact and remaps their namespace", async () => {
+    await store.upsert([
+      record("a", [1, 0, 0], { namespace: "src", content: "alpha", metadata: { path: "a.ts" } }),
+      record("b", [0, 1, 0], { namespace: "src" }),
+    ]);
+    await store.copyNamespace("src", "dst");
+
+    const copied = await store.get("dst", "a");
+    expect(copied?.namespace).toBe("dst");
+    expect(copied?.content).toBe("alpha");
+    expect(copied?.embedding).toEqual([1, 0, 0]);
+    expect(copied?.metadata).toEqual({ path: "a.ts" });
+    expect((await store.listSummaries("dst")).map(s => s.id).sort()).toEqual(["a", "b"]);
+    // source stays untouched
+    expect((await store.get("src", "a"))?.namespace).toBe("src");
+  });
+
+  it("replaces any prior target content", async () => {
+    await store.upsert([record("old", [1, 0, 0], { namespace: "dst" })]);
+    await store.upsert([record("new", [0, 1, 0], { namespace: "src" })]);
+    await store.copyNamespace("src", "dst");
+    expect(await store.get("dst", "old")).toBeNull();
+    expect(await store.get("dst", "new")).not.toBeNull();
+  });
+
+  it("is a no-op for a missing source or identical namespaces", async () => {
+    await store.upsert([record("keep", [1, 0, 0], { namespace: "dst" })]);
+    await store.copyNamespace("ghost", "dst");
+    expect(await store.get("dst", "keep")).not.toBeNull();
+    await store.copyNamespace("dst", "dst");
+    expect((await store.listSummaries("dst")).length).toBe(1);
+  });
+});
+
 describe("FileVectorStore layout", () => {
   it("honors partitionDir and recordsFile for byte-compatible layouts", async () => {
     const memStore = new FileVectorStore({

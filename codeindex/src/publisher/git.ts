@@ -81,6 +81,69 @@ export function parseRepositoryFromOriginUrl(url: string): string | null {
   return segments.slice(-2).join('/');
 }
 
+// paths are relative to rootDir (git --relative / ls-files cwd semantics), posix separators.
+// `touched` = every path whose indexed chunks are stale (modified, deleted, renamed either side,
+// untracked); which of those still exist and are indexable is decided by the walker, not git
+export interface ChangedFiles {
+  touched: string[];
+}
+
+export function isAncestor(rootDir: string, ancestorSha: string, descendantSha: string): boolean {
+  try {
+    execSync(`git merge-base --is-ancestor ${quoteSha(ancestorSha)} ${quoteSha(descendantSha)}`, {
+      cwd: rootDir,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// everything different between the baseline commit and the working tree: committed, staged,
+// unstaged (diff against <sha> with no second rev spans all three) plus untracked files.
+// --no-renames keeps a rename as delete+add so both sides land in `touched`
+export function changedFilesSince(rootDir: string, baselineSha: string): ChangedFiles {
+  const diff = run(
+    `git diff --name-status --no-renames --relative ${quoteSha(baselineSha)}`,
+    rootDir,
+  );
+  const touched = new Set<string>();
+  for (const line of diff.split(/\r?\n/)) {
+    if (line.trim().length === 0) continue;
+    const tab = line.indexOf('\t');
+    if (tab === -1) continue;
+    touched.add(normalizeGitPath(line.slice(tab + 1)));
+  }
+  const untracked = run('git ls-files --others --exclude-standard', rootDir);
+  for (const line of untracked.split(/\r?\n/)) {
+    if (line.trim().length > 0) touched.add(normalizeGitPath(line));
+  }
+  return { touched: [...touched].sort() };
+}
+
+// git -z is not used, so quoted/escaped names arrive wrapped in double quotes
+function normalizeGitPath(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+    try {
+      return JSON.parse(trimmed) as string;
+    } catch {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return trimmed;
+}
+
+// shas reach here from commit.json dir names (validated on write) and git itself,
+// but they still get injected into a shell command — allow only rev characters
+function quoteSha(sha: string): string {
+  if (!/^[A-Za-z0-9_\-]+$/.test(sha)) {
+    throw new Error(`Invalid commit identifier: ${sha}`);
+  }
+  return sha;
+}
+
 function run(cmd: string, cwd: string): string {
   return execSync(cmd, { cwd, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
 }
